@@ -63,7 +63,7 @@ export default function ChatRoom() {
 
     // Initialize socket connection
     useEffect(() => {
-        socketRef.current = io("http://localhost:3000");
+        socketRef.current = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3000");
 
         // Handle successful room join
         socketRef.current.on("roomJoined", ({ room, isCreator: creator, message: joinMessage, dateSelections, suggestions, votes }) => {

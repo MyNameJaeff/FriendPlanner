@@ -412,9 +412,9 @@ setInterval(() => {
         }
     }
 }, 300000); // Check every 5 minutes
-
-server.listen(3000, () => {
-    console.log('🚀 Server running at http://localhost:3000');
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`🚀 Server running at ${PORT}`);
     console.log('📝 Rooms will persist as long as they have users');
     console.log('🔒 Password protection enabled for all rooms');
 });

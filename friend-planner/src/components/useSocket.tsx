@@ -6,7 +6,10 @@ const useSocket = (url: string) => {
     const socketRef = useRef<Socket | null>(null);
 
     useEffect(() => {
-        const socket = io(url, { transports: ["websocket"] });
+        console.log(process.env.NEXT_PUBLIC_SOCKET_URL || url);
+        const socket = io(process.env.NEXT_PUBLIC_SOCKET_URL || url, {
+            transports: ["websocket"]
+        });
         socketRef.current = socket;
 
         socket.on("connect", () => {
