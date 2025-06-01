@@ -316,10 +316,10 @@ export default function ChatRoom() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+        <div className="min-w-1/2 max-w-4xl h-full grow mx-auto p-6 bg-[#C5A880] rounded-lg jetbrains-mono shadow-[-8px_8px_20px_rgba(0,0,0,0.3)]">
             {!joinedRoom ? (
                 <div className="space-y-4">
-                    <h2 className="text-2xl font-bold text-center mb-6">Join or Create Planning Room</h2>
+                    <h2 className="text-3xl font-bold text-center mb-6 text-[#532E1C] tracking-wide">Join or Create Planning Room</h2>
 
                     {error && (
                         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
@@ -328,29 +328,29 @@ export default function ChatRoom() {
                     )}
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Your Name</label>
+                        <label className="block text-lg font-bold text-[#532E1C] mb-2 tracking-wide">Your Name</label>
                         <input
                             type="text"
                             placeholder="Enter your name (will be lowercase)"
                             value={username}
                             onChange={(e) => setUsername(e.target.value.toLowerCase())}
-                            className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="focus:outline-2 outline-[#532E1C] w-full p-3 border-1 border-[#C5A880] rounded-md focus:ring-2 focus:ring-[#C5A880] bg-white text-[#0F0F0F] text-lg"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Room Name</label>
+                        <label className="block text-lg font-bold text-[#532E1C] mb-2 tracking-wide">Room Name</label>
                         <div className="flex space-x-2">
                             <input
                                 type="text"
                                 placeholder="Enter room name (will be lowercase)"
                                 value={room}
                                 onChange={(e) => setRoom(e.target.value.toLowerCase())}
-                                className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 p-3 border-1 focus:outline-2 outline-[#532E1C] border-[#C5A880] rounded-md focus:ring-2 focus:ring-[#C5A880] bg-white text-[#0F0F0F] text-lg"
                             />
                             <button
                                 onClick={checkRoomExists}
-                                className="px-4 py-3 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+                                className="cursor-pointer px-6 py-3 bg-[#532E1C]/75 text-white rounded-md hover:bg-[#532E1C] transition-colors text-lg font-bold tracking-wide"
                             >
                                 Check
                             </button>
@@ -358,21 +358,21 @@ export default function ChatRoom() {
                     </div>
 
                     {roomInfo && (
-                        <div className={`p-3 rounded-md ${roomInfo.exists ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                        <div className={`p-4 rounded-md ${roomInfo.exists ? 'bg-[#E6E6E6] text-[#532E1C]' : 'bg-[#E6E6E6] text-[#532E1C]'}`}>
                             {roomInfo.exists ? (
                                 <div>
-                                    <p><strong>Room exists!</strong></p>
-                                    <p>Users: {roomInfo.userCount}</p>
-                                    <p className="text-sm">You need the password to join.</p>
+                                    <p className="text-lg font-bold tracking-wide">Room exists!</p>
+                                    <p className="text-lg tracking-wide">Users: {roomInfo.userCount}</p>
+                                    <p className="text-base tracking-wide">You need the password to join.</p>
                                 </div>
                             ) : (
-                                <p><strong>New room!</strong> You&apos;ll be the creator and need to set a password.</p>
+                                <p className="text-lg font-bold tracking-wide">New room! You&apos;ll be the creator and need to set a password.</p>
                             )}
                         </div>
                     )}
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                        <label className="block text-lg font-bold text-[#532E1C] mb-2 tracking-wide">
                             Password {roomInfo?.exists ? "(to join)" : "(to create room)"}
                         </label>
                         <input
@@ -380,21 +380,21 @@ export default function ChatRoom() {
                             placeholder="Enter password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full p-3 border-2 border-[#C5A880] rounded-md focus:outline-none focus:ring-2 focus:ring-[#C5A880] bg-white text-[#0F0F0F] text-lg"
                         />
                     </div>
 
                     <button
                         onClick={joinRoom}
                         disabled={!username.trim() || !room.trim() || !password.trim()}
-                        className="w-full bg-blue-500 text-white p-3 rounded-md hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        className="w-full bg-[#532E1C]/75 text-white p-3 rounded-md hover:bg-[#532E1C] hover:text-white disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-xl font-bold tracking-wide"
                     >
                         {roomInfo?.exists ? 'Join Room' : 'Create & Join Room'}
                     </button>
 
                     <button
                         onClick={clearAllData}
-                        className="w-full bg-red-500 text-white p-2 rounded-md hover:bg-red-600 transition-colors text-sm"
+                        className="w-full bg-[#681f1f] text-white p-2 rounded-md hover:bg-[#8f2323] transition-colors text-lg font-bold tracking-wide"
                     >
                         Clear All Saved Data
                     </button>
@@ -403,22 +403,22 @@ export default function ChatRoom() {
                 <div className="space-y-6">
                     <div className="flex justify-between items-center">
                         <div>
-                            <h3 className="text-xl font-semibold">Room: {joinedRoom}</h3>
-                            <p className="text-sm text-gray-600">
+                            <h3 className="text-2xl font-bold text-[#532E1C] tracking-wide">Room: {joinedRoom}</h3>
+                            <p className="text-lg text-[#532E1C] tracking-wide">
                                 {isCreator ? '👑 You are the creator' : '👤 Member'} | User: {username}
                             </p>
                         </div>
                         <button
                             onClick={leaveRoom}
-                            className="px-4 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                            className="px-4 py-2 bg-[#532E1C] text-white text-lg rounded hover:bg-[#0F0F0F] transition-colors font-bold tracking-wide"
                         >
                             Leave Room
                         </button>
                     </div>
 
                     {/* Date Selection Section - Now supports multiple dates */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-lg font-semibold mb-4">📅 Select Your Preferred Dates (Multiple Selection)</h3>
+                    <div className="bg-white p-6 rounded-lg border-2 border-[#C5A880]">
+                        <h3 className="text-xl font-bold mb-4 text-[#532E1C] tracking-wide">📅 Select Your Preferred Dates (Multiple Selection)</h3>
                         <div className="flex flex-col lg:flex-row gap-6">
                             <div className="flex-1">
                                 <DatePicker
@@ -439,33 +439,33 @@ export default function ChatRoom() {
                                     inline
                                     highlightDates={selectedDates || dateSelections}
                                 />
-                                <div className="mt-2 text-sm text-gray-600">
+                                <div className="mt-2 text-lg text-[#532E1C] tracking-wide">
                                     <p>Click dates to select/deselect them</p>
                                     <p>Selected: {selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''}</p>
                                 </div>
                             </div>
 
                             <div className="flex-1">
-                                <h4 className="font-medium mb-2">Date Selections:</h4>
+                                <h4 className="font-bold mb-2 text-[#532E1C] text-lg tracking-wide">Date Selections:</h4>
                                 {dateSelections.length === 0 ? (
-                                    <p className="text-gray-500">No dates selected yet</p>
+                                    <p className="text-[#532E1C] text-lg tracking-wide">No dates selected yet</p>
                                 ) : (
                                     <div className="space-y-2">
                                         {/* Display all individual date selections */}
                                         {dateSelections.map((selection) => (
-                                            <div key={selection.userId} className="bg-white p-2 rounded border text-sm">
+                                            <div key={selection.userId} className="bg-[#E6E6E6] p-3 rounded border-2 border-[#C5A880] text-lg">
                                                 <div className="flex justify-between items-start">
                                                     <div>
-                                                        <span className="font-medium">{selection.username}:</span>
+                                                        <span className="font-bold text-[#532E1C] tracking-wide">{selection.username}:</span>
                                                         <div className="mt-1">
                                                             {selection.dates.map((date) => (
-                                                                <span key={date} className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                                                <span key={date} className="inline-block bg-[#C5A880] text-[#532E1C] px-2 py-1 rounded text-base mr-1 mb-1 font-bold tracking-wide">
                                                                     {new Date(date + 'T00:00:00').toLocaleDateString()}
                                                                 </span>
                                                             ))}
                                                         </div>
                                                     </div>
-                                                    <span className="text-gray-500 text-xs">
+                                                    <span className="text-[#532E1C] text-base tracking-wide">
                                                         {new Date(selection.timestamp).toLocaleTimeString()}
                                                     </span>
                                                 </div>
@@ -474,11 +474,11 @@ export default function ChatRoom() {
 
                                         {/* Show most popular dates if there's consensus */}
                                         {mostCommonDates.length > 0 && mostCommonDates[0].count > 1 && (
-                                            <div className="mt-3 p-3 bg-green-100 rounded border-l-4 border-green-400">
-                                                <p className="font-semibold text-green-800">
+                                            <div className="mt-3 p-4 bg-[#C5A880] rounded border-l-4 border-[#532E1C]">
+                                                <p className="font-bold text-[#532E1C] text-lg tracking-wide">
                                                     🎯 Most Popular Dates:
                                                 </p>
-                                                <div className="text-sm text-green-600 mt-1">
+                                                <div className="text-lg text-[#532E1C] mt-1 tracking-wide">
                                                     {mostCommonDates.slice(0, 3).map(({ date, count }) => (
                                                         <div key={date} className="flex justify-between">
                                                             <span>{new Date(date + 'T00:00:00').toLocaleDateString()}</span>
@@ -494,13 +494,13 @@ export default function ChatRoom() {
                         </div>
 
                         {getCurrentUserDateSelection() && (
-                            <div className="mt-3 p-2 bg-blue-100 rounded text-sm flex justify-between items-center">
-                                <span>✅ Your selected dates: {getCurrentUserDateSelection()!.dates.map(date =>
+                            <div className="mt-3 p-3 bg-[#C5A880] rounded text-lg flex justify-between items-center">
+                                <span className="text-[#532E1C] font-bold tracking-wide">✅ Your selected dates: {getCurrentUserDateSelection()!.dates.map(date =>
                                     new Date(date + 'T00:00:00').toLocaleDateString()
                                 ).join(', ')}</span>
                                 <button
                                     onClick={deleteDateSelection}
-                                    className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600 transition-colors"
+                                    className="bg-[#532E1C] text-white text-base px-3 py-1 rounded hover:bg-[#0F0F0F] transition-colors font-bold tracking-wide"
                                 >
                                     Delete
                                 </button>
@@ -509,8 +509,8 @@ export default function ChatRoom() {
                     </div>
 
                     {/* Suggestions Section */}
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-lg font-semibold mb-4">💡 Activity Suggestions</h3>
+                    <div className="bg-white p-6 rounded-lg border-2 border-[#C5A880]">
+                        <h3 className="text-xl font-bold mb-4 text-[#532E1C] tracking-wide">💡 Activity Suggestions</h3>
 
                         {!getCurrentUserSuggestion() ? (
                             <div className="flex space-x-2 mb-4">
@@ -520,22 +520,22 @@ export default function ChatRoom() {
                                     value={newSuggestion}
                                     onChange={(e) => setNewSuggestion(e.target.value)}
                                     onKeyDown={(e) => e.key === "Enter" && sendSuggestion()}
-                                    className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="flex-1 p-3 border-2 border-[#C5A880] rounded-md focus:outline-none focus:ring-2 focus:ring-[#C5A880] text-[#0F0F0F] text-lg"
                                 />
                                 <button
                                     onClick={sendSuggestion}
                                     disabled={!newSuggestion.trim()}
-                                    className="bg-green-500 text-white px-6 py-3 rounded-md hover:bg-green-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                    className="bg-[#C5A880] text-[#532E1C] px-6 py-3 rounded-md hover:bg-[#532E1C] hover:text-white disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-bold text-lg tracking-wide"
                                 >
                                     Suggest
                                 </button>
                             </div>
                         ) : (
-                            <div className="mb-4 p-2 bg-blue-100 rounded text-sm flex justify-between items-center">
-                                <span>✅ Your suggestion: &quot;{getCurrentUserSuggestion()!.suggestion}&quot;</span>
+                            <div className="mb-4 p-3 bg-[#C5A880] rounded text-lg flex justify-between items-center">
+                                <span className="text-[#532E1C] font-bold tracking-wide">✅ Your suggestion: &quot;{getCurrentUserSuggestion()!.suggestion}&quot;</span>
                                 <button
                                     onClick={deleteSuggestion}
-                                    className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600 transition-colors"
+                                    className="bg-[#532E1C] text-white text-base px-3 py-1 rounded hover:bg-[#0F0F0F] transition-colors font-bold tracking-wide"
                                 >
                                     Delete
                                 </button>
@@ -543,35 +543,35 @@ export default function ChatRoom() {
                         )}
 
                         <div className="space-y-3">
-                            <h4 className="font-medium">All Suggestions:</h4>
+                            <h4 className="font-bold text-[#532E1C] text-lg tracking-wide">All Suggestions:</h4>
                             {suggestions.length === 0 ? (
-                                <p className="text-gray-500">No suggestions yet</p>
+                                <p className="text-[#532E1C] text-lg tracking-wide">No suggestions yet</p>
                             ) : (
                                 suggestions.map((suggestion) => (
-                                    <div key={suggestion.userId} className="bg-white p-3 rounded border">
+                                    <div key={suggestion.userId} className="bg-[#E6E6E6] p-4 rounded border-2 border-[#C5A880]">
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
-                                                <span className="font-medium">{suggestion.username}:</span>
-                                                <span className="ml-2">{suggestion.suggestion}</span>
+                                                <span className="font-bold text-[#532E1C] text-lg tracking-wide">{suggestion.username}:</span>
+                                                <span className="ml-2 text-[#0F0F0F] text-lg tracking-wide">{suggestion.suggestion}</span>
                                             </div>
-                                            <small className="text-gray-500">
+                                            <small className="text-[#532E1C] text-base tracking-wide">
                                                 {new Date(suggestion.timestamp).toLocaleTimeString()}
                                             </small>
                                         </div>
 
                                         <div className="flex justify-between items-center">
-                                            <span className="text-sm text-gray-600">
+                                            <span className="text-lg text-[#532E1C] font-bold tracking-wide">
                                                 Votes: {voteCounts[suggestion.suggestion] || 0}
                                             </span>
 
                                             {getCurrentUserVote()?.votedFor === suggestion.suggestion ? (
-                                                <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded">
+                                                <span className="text-lg bg-[#C5A880] text-[#532E1C] px-3 py-1 rounded font-bold tracking-wide">
                                                     ✅ You voted for this
                                                 </span>
                                             ) : (
                                                 <button
                                                     onClick={() => sendVote(suggestion.suggestion)}
-                                                    className="cursor-pointer bg-blue-500 text-white text-sm px-3 py-1 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                                                    className="cursor-pointer bg-[#532E1C] text-white text-lg px-4 py-2 rounded hover:bg-[#0F0F0F] disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-bold tracking-wide"
                                                 >
                                                     Vote
                                                 </button>
@@ -583,24 +583,24 @@ export default function ChatRoom() {
                         </div>
 
                         {getCurrentUserVote() && (
-                            <div className="mt-3 p-2 bg-blue-100 rounded text-sm">
-                                🗳️ You voted for: &quot;{getCurrentUserVote()!.votedFor}&quot;
+                            <div className="mt-3 p-3 bg-[#C5A880] rounded text-lg">
+                                <span className="text-[#532E1C] font-bold tracking-wide">🗳️ You voted for: &quot;{getCurrentUserVote()!.votedFor}&quot;</span>
                             </div>
                         )}
 
                         {/* Vote Results */}
                         {Object.keys(voteCounts).length > 0 && (
-                            <div className="mt-4 p-3 bg-yellow-50 rounded">
-                                <h4 className="font-medium mb-2">🏆 Vote Results:</h4>
+                            <div className="mt-4 p-4 bg-[#E6E6E6] rounded border-2 border-[#C5A880]">
+                                <h4 className="font-bold mb-2 text-[#532E1C] text-lg tracking-wide">🏆 Vote Results:</h4>
                                 <div className="space-y-1">
                                     {Object.entries(voteCounts)
                                         .sort(([, a], [, b]) => b - a)
                                         .map(([suggestion, count]) => (
                                             <div key={suggestion} className="flex justify-between">
-                                                <span className={count === Math.max(...Object.values(voteCounts)) ? "font-semibold" : ""}>
+                                                <span className={`text-lg tracking-wide ${count === Math.max(...Object.values(voteCounts)) ? "font-bold text-[#532E1C]" : "text-[#0F0F0F]"}`}>
                                                     {suggestion}
                                                 </span>
-                                                <span className={`${count === Math.max(...Object.values(voteCounts)) ? "font-semibold text-green-600" : ""}`}>
+                                                <span className={`text-lg tracking-wide ${count === Math.max(...Object.values(voteCounts)) ? "font-bold text-[#532E1C]" : "text-[#0F0F0F]"}`}>
                                                     {count} vote{count !== 1 ? 's' : ''}
                                                 </span>
                                             </div>
@@ -612,9 +612,9 @@ export default function ChatRoom() {
 
                     {/* Summary Section */}
                     {(dateSelections.length > 0 || suggestions.length > 0) && (
-                        <div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400">
-                            <h3 className="text-lg font-semibold mb-2">📋 Planning Summary</h3>
-                            <div className="text-sm space-y-1">
+                        <div className="bg-[#C5A880] p-6 rounded-lg border-l-6 border-b-6 border-t-2 border-r-2 border-[#532E1C]">
+                            <h3 className="text-xl font-bold mb-2 text-[#532E1C] tracking-wide">📋 Planning Summary</h3>
+                            <div className="text-lg space-y-1 text-[#532E1C] tracking-wide">
                                 <p>👥 Active participants: {new Set([...dateSelections.map(d => d.username), ...suggestions.map(s => s.username)]).size}</p>
                                 {mostCommonDates.length > 0 && mostCommonDates[0].count > 1 && (
                                     <p>📅 Most popular date: {new Date(mostCommonDates[0].date + 'T00:00:00').toLocaleDateString()} ({mostCommonDates[0].count} votes)</p>
