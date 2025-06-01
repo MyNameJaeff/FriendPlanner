@@ -15,7 +15,7 @@ const io = new Server(server, {
 });
 
 // In-memory storage for rooms and messages
-const rooms = new Map(); // { roomName: { password: string, messages: [], createdAt: Date, users: Set, dateSelections: Map, suggestions: Map, votes: Map } }
+const rooms = new Map(); // { roomName: { password: string, messages: [], createdAt: Date, users: Set, dateSelections: Map, suggestions: Map, votes: Map, userData: Map } }
 const userRooms = new Map(); // { socketId: roomName }
 
 app.get('/', (req, res) => {
@@ -39,6 +39,22 @@ app.get('/', (req, res) => {
         </html>
     `);
 });
+
+// Helper function to get user key (room + username combination)
+function getUserKey(roomName, username) {
+    return `${roomName}:${username.toLowerCase().trim()}`;
+}
+
+// Helper function to find user's existing data
+function findUserData(roomData, username) {
+    const normalizedUsername = username.toLowerCase().trim();
+    for (const [userKey, userData] of roomData.userData.entries()) {
+        if (userData.username === normalizedUsername) {
+            return { userKey, userData };
+        }
+    }
+    return null;
+}
 
 io.on("connection", (socket) => {
     console.log("🟢 User connected:", socket.id);
@@ -68,13 +84,58 @@ io.on("connection", (socket) => {
             roomData.users.add(socket.id);
             userRooms.set(socket.id, roomName);
 
-            console.log(`Socket ${socket.id} (${normalizedUsername}) joined existing room ${roomName}`);
+            // Check if user has existing data and restore it
+            // Check if user has existing data and restore it
+            const existingUserData = findUserData(roomData, normalizedUsername);
+            const userKey = getUserKey(roomName, normalizedUsername);
+
+            if (existingUserData) {
+                // Remove old socket mappings first to prevent duplicates
+                roomData.dateSelections.delete(existingUserData.userData.socketId);
+                roomData.suggestions.delete(existingUserData.userData.socketId);
+                roomData.votes.delete(existingUserData.userData.socketId);
+
+                // Restore data with new socket ID if it exists
+                if (existingUserData.userData.dateSelections) {
+                    roomData.dateSelections.set(socket.id, existingUserData.userData.dateSelections);
+                }
+                if (existingUserData.userData.suggestions) {
+                    roomData.suggestions.set(socket.id, existingUserData.userData.suggestions);
+                }
+                if (existingUserData.userData.votes) {
+                    roomData.votes.set(socket.id, existingUserData.userData.votes);
+                }
+
+                // Update userData with new socket ID
+                roomData.userData.set(userKey, {
+                    username: normalizedUsername,
+                    socketId: socket.id,
+                    dateSelections: existingUserData.userData.dateSelections,
+                    suggestions: existingUserData.userData.suggestions,
+                    votes: existingUserData.userData.votes,
+                    lastActive: new Date()
+                });
+
+                console.log(`Socket ${socket.id} (${normalizedUsername}) rejoined room ${roomName} with existing data`);
+            } else {
+                // New user
+                roomData.userData.set(userKey, {
+                    username: normalizedUsername,
+                    socketId: socket.id,
+                    dateSelections: null,
+                    suggestions: null,
+                    votes: null,
+                    lastActive: new Date()
+                });
+
+                console.log(`Socket ${socket.id} (${normalizedUsername}) joined existing room ${roomName} as new user`);
+            }
 
             // Convert Maps to arrays for sending
             const dateSelectionsArray = Array.from(roomData.dateSelections.entries()).map(([userId, data]) => ({
                 userId,
                 username: data.username,
-                date: data.date,
+                dates: data.dates, // Changed from date to dates for multiple selection
                 timestamp: data.timestamp
             }));
 
@@ -96,7 +157,9 @@ io.on("connection", (socket) => {
             socket.emit("roomJoined", {
                 room: roomName,
                 isCreator: false,
-                message: `You joined room: ${roomName}`,
+                message: existingUserData ?
+                    `Welcome back to room: ${roomName}` :
+                    `You joined room: ${roomName}`,
                 messages: roomData.messages,
                 dateSelections: dateSelectionsArray,
                 suggestions: suggestionsArray,
@@ -106,7 +169,9 @@ io.on("connection", (socket) => {
             // Notify other users in the room
             socket.to(roomName).emit("userJoined", {
                 username: normalizedUsername,
-                message: `${normalizedUsername} joined the room`,
+                message: existingUserData ?
+                    `${normalizedUsername} rejoined the room` :
+                    `${normalizedUsername} joined the room`,
                 timestamp: new Date().toISOString()
             });
 
@@ -120,9 +185,10 @@ io.on("connection", (socket) => {
             const newRoom = {
                 password: password.trim(),
                 messages: [],
-                dateSelections: new Map(), // userId -> { username, date, timestamp }
-                suggestions: new Map(), // userId -> { username, suggestion, timestamp }
-                votes: new Map(), // userId -> { username, votedFor, timestamp }
+                dateSelections: new Map(), // socketId -> { username, dates: [], timestamp }
+                suggestions: new Map(), // socketId -> { username, suggestion, timestamp }
+                votes: new Map(), // socketId -> { username, votedFor, timestamp }
+                userData: new Map(), // userKey -> { username, socketId, dateSelections, suggestions, votes, lastActive }
                 createdAt: new Date(),
                 users: new Set([socket.id])
             };
@@ -130,6 +196,17 @@ io.on("connection", (socket) => {
             rooms.set(roomName, newRoom);
             userRooms.set(socket.id, roomName);
             socket.join(roomName);
+
+            // Add user data
+            const userKey = getUserKey(roomName, normalizedUsername);
+            newRoom.userData.set(userKey, {
+                username: normalizedUsername,
+                socketId: socket.id,
+                dateSelections: null,
+                suggestions: null,
+                votes: null,
+                lastActive: new Date()
+            });
 
             console.log(`Socket ${socket.id} (${normalizedUsername}) created room ${roomName}`);
 
@@ -144,7 +221,125 @@ io.on("connection", (socket) => {
         }
     });
 
-    socket.on("sendDateSelection", ({ room, date, username }) => {
+    socket.on("deleteDateSelection", ({ room, username }) => {
+        const roomName = room.toLowerCase().trim();
+        const normalizedUsername = username.toLowerCase().trim();
+
+        if (!rooms.has(roomName)) {
+            socket.emit("error", "Room does not exist");
+            return;
+        }
+
+        const roomData = rooms.get(roomName);
+
+        if (!roomData.users.has(socket.id)) {
+            socket.emit("error", "You are not in this room");
+            return;
+        }
+
+        // Remove from dateSelections Map
+        roomData.dateSelections.delete(socket.id);
+
+        // Update userData
+        const userKey = getUserKey(roomName, normalizedUsername);
+        if (roomData.userData.has(userKey)) {
+            const userData = roomData.userData.get(userKey);
+            userData.dateSelections = null;
+            userData.lastActive = new Date();
+        }
+
+        // Broadcast updated selections
+        const dateSelectionsArray = Array.from(roomData.dateSelections.entries()).map(([userId, data]) => ({
+            userId,
+            username: data.username,
+            dates: data.dates,
+            timestamp: data.timestamp
+        }));
+
+        io.to(roomName).emit("dateSelectionsUpdate", {
+            dateSelections: dateSelectionsArray,
+            mostCommonDates: [],
+            mostCommonCount: 0,
+            dateCounts: {}
+        });
+
+        console.log(`Date selection deleted in room "${roomName}" by "${normalizedUsername}"`);
+    });
+
+    socket.on("deleteSuggestion", ({ room, username }) => {
+        const roomName = room.toLowerCase().trim();
+        const normalizedUsername = username.toLowerCase().trim();
+
+        if (!rooms.has(roomName)) {
+            socket.emit("error", "Room does not exist");
+            return;
+        }
+
+        const roomData = rooms.get(roomName);
+
+        if (!roomData.users.has(socket.id)) {
+            socket.emit("error", "You are not in this room");
+            return;
+        }
+
+        // Get the suggestion before deleting to remove votes
+        const userSuggestion = roomData.suggestions.get(socket.id);
+
+        // Remove from suggestions Map
+        roomData.suggestions.delete(socket.id);
+
+        // Remove all votes for this suggestion
+        if (userSuggestion) {
+            for (const [userId, voteData] of roomData.votes.entries()) {
+                if (voteData.votedFor === userSuggestion.suggestion) {
+                    roomData.votes.delete(userId);
+
+                    // Update userData for voters
+                    const voterUserKey = getUserKey(roomName, voteData.username);
+                    if (roomData.userData.has(voterUserKey)) {
+                        const voterUserData = roomData.userData.get(voterUserKey);
+                        voterUserData.votes = null;
+                        voterUserData.lastActive = new Date();
+                    }
+                }
+            }
+        }
+
+        // Update userData for suggestion author
+        const userKey = getUserKey(roomName, normalizedUsername);
+        if (roomData.userData.has(userKey)) {
+            const userData = roomData.userData.get(userKey);
+            userData.suggestions = null;
+            userData.lastActive = new Date();
+        }
+
+        // Broadcast updates
+        const suggestionsArray = Array.from(roomData.suggestions.entries()).map(([userId, data]) => ({
+            userId,
+            username: data.username,
+            suggestion: data.suggestion,
+            timestamp: data.timestamp
+        }));
+
+        const votesArray = Array.from(roomData.votes.entries()).map(([userId, data]) => ({
+            userId,
+            username: data.username,
+            votedFor: data.votedFor,
+            timestamp: data.timestamp
+        }));
+
+        const voteCounts = {};
+        votesArray.forEach(vote => {
+            voteCounts[vote.votedFor] = (voteCounts[vote.votedFor] || 0) + 1;
+        });
+
+        io.to(roomName).emit("suggestionsUpdate", { suggestions: suggestionsArray });
+        io.to(roomName).emit("votesUpdate", { votes: votesArray, voteCounts });
+
+        console.log(`Suggestion deleted in room "${roomName}" by "${normalizedUsername}"`);
+    });
+
+    socket.on("sendDateSelection", ({ room, dates, username }) => {
         const roomName = room.toLowerCase().trim();
         const normalizedUsername = username.toLowerCase().trim();
 
@@ -161,46 +356,75 @@ io.on("connection", (socket) => {
             return;
         }
 
+        // Ensure dates is an array and handle timezone properly
+        const processedDates = Array.isArray(dates) ? dates : [dates];
+        const normalizedDates = processedDates.map(date => {
+            // Handle date properly to avoid timezone issues
+            if (typeof date === 'string') {
+                // If it's already a date string, use it as is
+                return date;
+            } else if (date instanceof Date) {
+                // Convert to YYYY-MM-DD format in local timezone
+                return date.getFullYear() + '-' +
+                    String(date.getMonth() + 1).padStart(2, '0') + '-' +
+                    String(date.getDate()).padStart(2, '0');
+            }
+            return date;
+        });
+
         const dateSelection = {
             username: normalizedUsername,
-            date: date,
+            dates: normalizedDates, // Changed from date to dates
             timestamp: new Date().toISOString(),
         };
 
-        // Store one date per user (overwrite if exists)
+        // Store dates per user (overwrite if exists)
         roomData.dateSelections.set(socket.id, dateSelection);
+
+        // Update userData
+        const userKey = getUserKey(roomName, normalizedUsername);
+        if (roomData.userData.has(userKey)) {
+            const userData = roomData.userData.get(userKey);
+            userData.dateSelections = dateSelection;
+            userData.lastActive = new Date();
+        }
 
         // Convert to array for broadcasting
         const dateSelectionsArray = Array.from(roomData.dateSelections.entries()).map(([userId, data]) => ({
             userId,
             username: data.username,
-            date: data.date,
+            dates: data.dates,
             timestamp: data.timestamp
         }));
 
-        // Calculate most common date
+        // Calculate most common dates
         const dateCounts = {};
         dateSelectionsArray.forEach(selection => {
-            dateCounts[selection.date] = (dateCounts[selection.date] || 0) + 1;
+            selection.dates.forEach(date => {
+                dateCounts[date] = (dateCounts[date] || 0) + 1;
+            });
         });
 
-        let mostCommonDate = null;
+        let mostCommonDates = [];
         let maxCount = 0;
         for (const [date, count] of Object.entries(dateCounts)) {
             if (count > maxCount) {
                 maxCount = count;
-                mostCommonDate = date;
+                mostCommonDates = [date];
+            } else if (count === maxCount) {
+                mostCommonDates.push(date);
             }
         }
 
         // Broadcast updated date selections to all users in the room
         io.to(roomName).emit("dateSelectionsUpdate", {
             dateSelections: dateSelectionsArray,
-            mostCommonDate,
-            mostCommonCount: maxCount
+            mostCommonDates,
+            mostCommonCount: maxCount,
+            dateCounts
         });
 
-        console.log(`Date selection in room "${roomName}" from "${normalizedUsername}": "${date}"`);
+        console.log(`Date selection in room "${roomName}" from "${normalizedUsername}": [${normalizedDates.join(', ')}]`);
     });
 
     socket.on("sendSuggestion", ({ room, suggestion, username }) => {
@@ -228,6 +452,14 @@ io.on("connection", (socket) => {
 
         // Store one suggestion per user (overwrite if exists)
         roomData.suggestions.set(socket.id, suggestionData);
+
+        // Update userData
+        const userKey = getUserKey(roomName, normalizedUsername);
+        if (roomData.userData.has(userKey)) {
+            const userData = roomData.userData.get(userKey);
+            userData.suggestions = suggestionData;
+            userData.lastActive = new Date();
+        }
 
         // Convert to array for broadcasting
         const suggestionsArray = Array.from(roomData.suggestions.entries()).map(([userId, data]) => ({
@@ -278,6 +510,14 @@ io.on("connection", (socket) => {
         // Store one vote per user (overwrite if exists)
         roomData.votes.set(socket.id, voteData);
 
+        // Update userData
+        const userKey = getUserKey(roomName, normalizedUsername);
+        if (roomData.userData.has(userKey)) {
+            const userData = roomData.userData.get(userKey);
+            userData.votes = voteData;
+            userData.lastActive = new Date();
+        }
+
         // Convert to array and calculate vote counts
         const votesArray = Array.from(roomData.votes.entries()).map(([userId, data]) => ({
             userId,
@@ -323,23 +563,29 @@ io.on("connection", (socket) => {
             const roomData = rooms.get(roomName);
             roomData.users.delete(socket.id);
 
-            // Remove user's data
-            roomData.dateSelections.delete(socket.id);
-            roomData.suggestions.delete(socket.id);
-            roomData.votes.delete(socket.id);
+            // Keep user's data but remove from active maps
+            // Update userData to mark as inactive but keep the data
+            const userKey = Array.from(roomData.userData.entries()).find(([/* key, */ userData]) =>
+                userData.socketId === socket.id
+            )?.[0];
+
+            if (userKey) {
+                const userData = roomData.userData.get(userKey);
+                userData.socketId = null; // Mark as disconnected but keep data
+                userData.lastActive = new Date();
+            }
 
             socket.leave(roomName);
-            userRooms.delete(socket.id);
 
-            // Notify other users and send updated data
+            // Notify other users
             socket.to(roomName).emit("userLeft", {
                 message: "A user left the room",
                 timestamp: new Date().toISOString()
             });
 
-            // Send updated data to remaining users
+            // Send updated data to remaining users (data remains the same)
             const dateSelectionsArray = Array.from(roomData.dateSelections.entries()).map(([userId, data]) => ({
-                userId, username: data.username, date: data.date, timestamp: data.timestamp
+                userId, username: data.username, dates: data.dates, timestamp: data.timestamp
             }));
             const suggestionsArray = Array.from(roomData.suggestions.entries()).map(([userId, data]) => ({
                 userId, username: data.username, suggestion: data.suggestion, timestamp: data.timestamp
@@ -352,41 +598,35 @@ io.on("connection", (socket) => {
             socket.to(roomName).emit("suggestionsUpdate", { suggestions: suggestionsArray });
             socket.to(roomName).emit("votesUpdate", { votes: votesArray });
 
-            // If room is empty, delete it
-            if (roomData.users.size === 0) {
-                rooms.delete(roomName);
-                console.log(`Room ${roomName} deleted (no users remaining)`);
-            }
-
-            console.log(`Socket ${socket.id} left room ${roomName}`);
+            console.log(`Socket ${socket.id} left room ${roomName} (data preserved)`);
         }
     });
 
     socket.on("disconnect", () => {
         console.log("🔴 User disconnected:", socket.id);
 
-        // Remove user from their room
+        // Remove user from their room but keep their data
         const roomName = userRooms.get(socket.id);
         if (roomName && rooms.has(roomName)) {
             const roomData = rooms.get(roomName);
             roomData.users.delete(socket.id);
 
-            // Remove user's data
-            roomData.dateSelections.delete(socket.id);
-            roomData.suggestions.delete(socket.id);
-            roomData.votes.delete(socket.id);
+            // Keep user's data but update userData to mark as inactive
+            const userKey = Array.from(roomData.userData.entries()).find(([/* key, */ userData]) =>
+                userData.socketId === socket.id
+            )?.[0];
+
+            if (userKey) {
+                const userData = roomData.userData.get(userKey);
+                userData.socketId = null; // Mark as disconnected but keep data
+                userData.lastActive = new Date();
+            }
 
             // Notify other users
             socket.to(roomName).emit("userLeft", {
                 message: "A user disconnected",
                 timestamp: new Date().toISOString()
             });
-
-            // If room is empty, delete it
-            if (roomData.users.size === 0) {
-                rooms.delete(roomName);
-                console.log(`Room ${roomName} deleted (no users remaining)`);
-            }
         }
 
         userRooms.delete(socket.id);
@@ -398,26 +638,49 @@ io.on("connection", (socket) => {
             name: roomName,
             users: rooms.get(roomName).users.size,
             messages: rooms.get(roomName).messages.length,
+            dataEntries: rooms.get(roomName).userData.size,
             createdAt: rooms.get(roomName).createdAt
         }));
         socket.emit("debugRoomsResponse", roomsList);
     });
 });
 
-// Cleanup function to remove old empty rooms (optional)
+// Enhanced cleanup function
 setInterval(() => {
     const now = new Date();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+    const oneHourMs = 60 * 60 * 1000; // 1 hour in milliseconds
+
     for (const [roomName, roomData] of rooms.entries()) {
-        // Remove rooms that have been empty for more than 1 hour
-        if (roomData.users.size === 0 && (now - roomData.createdAt) > 3600000) {
-            rooms.delete(roomName);
-            console.log(`Cleaned up old empty room: ${roomName}`);
+        const hasData = roomData.userData.size > 0 ||
+            roomData.messages.length > 0 ||
+            roomData.dateSelections.size > 0 ||
+            roomData.suggestions.size > 0 ||
+            roomData.votes.size > 0;
+
+        if (roomData.users.size === 0) {
+            if (hasData) {
+                // Room has data but no active users - delete after 30 days
+                if ((now - roomData.createdAt) > thirtyDaysMs) {
+                    rooms.delete(roomName);
+                    console.log(`Cleaned up room with data after 30 days: ${roomName}`);
+                }
+            } else {
+                // Room has no data and no users - delete after 1 hour
+                if ((now - roomData.createdAt) > oneHourMs) {
+                    rooms.delete(roomName);
+                    console.log(`Cleaned up empty room after 1 hour: ${roomName}`);
+                }
+            }
         }
     }
 }, 300000); // Check every 5 minutes
+
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running at ${PORT}`);
-    console.log('📝 Rooms will persist as long as they have users');
+    console.log('📝 Rooms with data persist for 30 days when empty');
+    console.log('📝 Empty rooms persist for 1 hour when empty');
     console.log('🔒 Password protection enabled for all rooms');
+    console.log('🔄 User data is preserved when they leave/disconnect');
 });

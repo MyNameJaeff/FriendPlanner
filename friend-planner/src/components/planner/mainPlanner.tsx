@@ -6,7 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 interface DateSelection {
     userId: string;
     username: string;
-    date: string;
+    dates: string[]; // Changed to array for multiple dates
     timestamp: string;
 }
 
@@ -34,11 +34,10 @@ export default function ChatRoom() {
     const [roomInfo, setRoomInfo] = useState<{ exists: boolean; userCount?: number; messageCount?: number } | null>(null);
     const socketRef = useRef<Socket | null>(null);
 
-    // Date selection state
-    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    // Date selection state - now supports multiple dates
+    const [selectedDates, setSelectedDates] = useState<Date[]>([]);
     const [dateSelections, setDateSelections] = useState<DateSelection[]>([]);
-    const [mostCommonDate, setMostCommonDate] = useState<string | null>(null);
-    const [mostCommonCount, setMostCommonCount] = useState<number>(0);
+    const [mostCommonDates, setMostCommonDates] = useState<{ date: string; count: number }[]>([]);
 
     // Suggestion and voting state
     const [newSuggestion, setNewSuggestion] = useState("");
@@ -70,17 +69,28 @@ export default function ChatRoom() {
             setJoinedRoom(room.toLowerCase());
             setIsCreator(creator);
             setError("");
+
+            // DON'T clear local state - just update with server data
             setDateSelections(dateSelections || []);
             setSuggestions(suggestions || []);
             setVotes(votes || []);
-            console.log(joinMessage);
+
+            console.log(room, creator, joinMessage, dateSelections, suggestions, votes);
         });
 
         // Handle date selections update
-        socketRef.current.on("dateSelectionsUpdate", ({ dateSelections, mostCommonDate, mostCommonCount }) => {
+        socketRef.current.on("dateSelectionsUpdate", ({ dateSelections, mostCommonDates }) => {
             setDateSelections(dateSelections);
-            setMostCommonDate(mostCommonDate);
-            setMostCommonCount(mostCommonCount);
+            setMostCommonDates(mostCommonDates || []);
+
+            // Update local selected dates to match server data for current user
+            const currentUserSelection = dateSelections.find((sel: { username: string; }) => sel.username === username.toLowerCase());
+            if (currentUserSelection) {
+                const dates = currentUserSelection.dates.map((dateStr: string) => new Date(dateStr + 'T00:00:00'));
+                setSelectedDates(dates);
+            } else {
+                setSelectedDates([]);
+            }
         });
 
         // Handle suggestions update
@@ -105,7 +115,7 @@ export default function ChatRoom() {
         });
 
         // Handle errors
-        socketRef.current.on("error", (errorMessage: string) => {
+        socketRef.current.on("error", (errorMessage) => {
             setError(errorMessage);
         });
 
@@ -120,17 +130,20 @@ export default function ChatRoom() {
         const savedPassword = localStorage.getItem('chatPassword');
 
         if (savedJoinedRoom && savedUsername && savedPassword) {
-            socketRef.current.emit("joinRoom", {
-                room: savedJoinedRoom.toLowerCase(),
-                username: savedUsername.toLowerCase(),
-                password: savedPassword
-            });
+            // Add a small delay to ensure socket is ready
+            setTimeout(() => {
+                socketRef.current?.emit("joinRoom", {
+                    room: savedJoinedRoom.toLowerCase(),
+                    username: savedUsername.toLowerCase(),
+                    password: savedPassword
+                });
+            }, 100);
         }
 
         return () => {
             socketRef.current?.disconnect();
         };
-    }, []);
+    }, [username]); // Add username as dependency
 
     // Save data to localStorage whenever state changes
     useEffect(() => {
@@ -180,16 +193,35 @@ export default function ChatRoom() {
         });
     };
 
-    const handleDateChange = (date: Date | null) => {
-        setSelectedDate(date);
-        if (date && joinedRoom) {
-            const formattedDate = date.toISOString().split('T')[0]; // Format date as YYYY-MM-DD
+    // Helper function to format date consistently and avoid timezone issues
+    const formatDateToString = (date: Date): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const handleDateChange = (dates: Date[]) => {
+        setSelectedDates(dates);
+        if (dates.length > 0 && joinedRoom) {
+            const formattedDates = dates.map(date => formatDateToString(date));
             socketRef.current?.emit("sendDateSelection", {
                 room: joinedRoom,
-                date: formattedDate,
+                dates: formattedDates,
                 username: username.toLowerCase()
             });
         }
+    };
+
+    const deleteDateSelection = () => {
+        if (!joinedRoom) return;
+
+        socketRef.current?.emit("deleteDateSelection", {
+            room: joinedRoom,
+            username: username.toLowerCase()
+        });
+
+        setSelectedDates([]);
     };
 
     const sendSuggestion = () => {
@@ -209,6 +241,15 @@ export default function ChatRoom() {
         });
 
         setNewSuggestion("");
+    };
+
+    const deleteSuggestion = () => {
+        if (!joinedRoom) return;
+
+        socketRef.current?.emit("deleteSuggestion", {
+            room: joinedRoom,
+            username: username.toLowerCase()
+        });
     };
 
     const sendVote = (suggestion: string) => {
@@ -233,8 +274,8 @@ export default function ChatRoom() {
         setSuggestions([]);
         setVotes([]);
         setVoteCounts({});
-        setMostCommonDate(null);
-        setMostCommonCount(0);
+        setMostCommonDates([]);
+        setSelectedDates([]);
         localStorage.removeItem('chatRoom');
         localStorage.removeItem('chatJoinedRoom');
         localStorage.removeItem('chatPassword');
@@ -256,8 +297,8 @@ export default function ChatRoom() {
         setSuggestions([]);
         setVotes([]);
         setVoteCounts({});
-        setMostCommonDate(null);
-        setMostCommonCount(0);
+        setMostCommonDates([]);
+        setSelectedDates([]);
         localStorage.clear();
     };
 
@@ -375,18 +416,33 @@ export default function ChatRoom() {
                         </button>
                     </div>
 
-                    {/* Date Selection Section */}
+                    {/* Date Selection Section - Now supports multiple dates */}
                     <div className="bg-gray-50 p-4 rounded-lg">
-                        <h3 className="text-lg font-semibold mb-4">📅 Select Your Preferred Date</h3>
+                        <h3 className="text-lg font-semibold mb-4">📅 Select Your Preferred Dates (Multiple Selection)</h3>
                         <div className="flex flex-col lg:flex-row gap-6">
                             <div className="flex-1">
                                 <DatePicker
-                                    selected={selectedDate}
-                                    onChange={handleDateChange}
+                                    selected={null}
+                                    onChange={(date) => {
+                                        if (!date) return;
+                                        const alreadySelected = selectedDates.some(
+                                            (d) => d.toDateString() === date.toDateString()
+                                        );
+                                        const newDates = alreadySelected
+                                            ? selectedDates.filter((d) => d.toDateString() !== date.toDateString())
+                                            : [...selectedDates, date];
+
+                                        handleDateChange(newDates);
+                                    }}
                                     dateFormat="yyyy-MM-dd"
                                     minDate={new Date()}
                                     inline
+                                    highlightDates={selectedDates || dateSelections}
                                 />
+                                <div className="mt-2 text-sm text-gray-600">
+                                    <p>Click dates to select/deselect them</p>
+                                    <p>Selected: {selectedDates.length} date{selectedDates.length !== 1 ? 's' : ''}</p>
+                                </div>
                             </div>
 
                             <div className="flex-1">
@@ -398,10 +454,17 @@ export default function ChatRoom() {
                                         {/* Display all individual date selections */}
                                         {dateSelections.map((selection) => (
                                             <div key={selection.userId} className="bg-white p-2 rounded border text-sm">
-                                                <div className="flex justify-between items-center">
-                                                    <span>
-                                                        <strong>{selection.username}:</strong> {new Date(selection.date).toLocaleDateString()}
-                                                    </span>
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <span className="font-medium">{selection.username}:</span>
+                                                        <div className="mt-1">
+                                                            {selection.dates.map((date) => (
+                                                                <span key={date} className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs mr-1 mb-1">
+                                                                    {new Date(date + 'T00:00:00').toLocaleDateString()}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                     <span className="text-gray-500 text-xs">
                                                         {new Date(selection.timestamp).toLocaleTimeString()}
                                                     </span>
@@ -409,15 +472,20 @@ export default function ChatRoom() {
                                             </div>
                                         ))}
 
-                                        {/* Show most popular date if there's consensus */}
-                                        {mostCommonDate && mostCommonCount > 1 && (
+                                        {/* Show most popular dates if there's consensus */}
+                                        {mostCommonDates.length > 0 && mostCommonDates[0].count > 1 && (
                                             <div className="mt-3 p-3 bg-green-100 rounded border-l-4 border-green-400">
                                                 <p className="font-semibold text-green-800">
-                                                    🎯 Most Popular Date: {new Date(mostCommonDate).toLocaleDateString()}
+                                                    🎯 Most Popular Dates:
                                                 </p>
-                                                <p className="text-sm text-green-600">
-                                                    {mostCommonCount} people selected this date
-                                                </p>
+                                                <div className="text-sm text-green-600 mt-1">
+                                                    {mostCommonDates.slice(0, 3).map(({ date, count }) => (
+                                                        <div key={date} className="flex justify-between">
+                                                            <span>{new Date(date + 'T00:00:00').toLocaleDateString()}</span>
+                                                            <span>{count} vote{count !== 1 ? 's' : ''}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -426,8 +494,16 @@ export default function ChatRoom() {
                         </div>
 
                         {getCurrentUserDateSelection() && (
-                            <div className="mt-3 p-2 bg-blue-100 rounded text-sm">
-                                ✅ Your selected date: {new Date(getCurrentUserDateSelection()!.date).toLocaleDateString()}
+                            <div className="mt-3 p-2 bg-blue-100 rounded text-sm flex justify-between items-center">
+                                <span>✅ Your selected dates: {getCurrentUserDateSelection()!.dates.map(date =>
+                                    new Date(date + 'T00:00:00').toLocaleDateString()
+                                ).join(', ')}</span>
+                                <button
+                                    onClick={deleteDateSelection}
+                                    className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600 transition-colors"
+                                >
+                                    Delete
+                                </button>
                             </div>
                         )}
                     </div>
@@ -455,8 +531,14 @@ export default function ChatRoom() {
                                 </button>
                             </div>
                         ) : (
-                            <div className="mb-4 p-2 bg-blue-100 rounded text-sm">
-                                ✅ Your suggestion: &quot;{getCurrentUserSuggestion()!.suggestion}&quot;
+                            <div className="mb-4 p-2 bg-blue-100 rounded text-sm flex justify-between items-center">
+                                <span>✅ Your suggestion: &quot;{getCurrentUserSuggestion()!.suggestion}&quot;</span>
+                                <button
+                                    onClick={deleteSuggestion}
+                                    className="bg-red-500 text-white text-xs px-2 py-1 rounded hover:bg-red-600 transition-colors"
+                                >
+                                    Delete
+                                </button>
                             </div>
                         )}
 
@@ -489,10 +571,9 @@ export default function ChatRoom() {
                                             ) : (
                                                 <button
                                                     onClick={() => sendVote(suggestion.suggestion)}
-                                                    /* disabled={suggestion.username === username.toLowerCase()} */
                                                     className="cursor-pointer bg-blue-500 text-white text-sm px-3 py-1 rounded hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                                                 >
-                                                    {/* suggestion.username === username.toLowerCase() ? "Your suggestion" : */ "Vote"}
+                                                    Vote
                                                 </button>
                                             )}
                                         </div>
@@ -535,8 +616,8 @@ export default function ChatRoom() {
                             <h3 className="text-lg font-semibold mb-2">📋 Planning Summary</h3>
                             <div className="text-sm space-y-1">
                                 <p>👥 Active participants: {new Set([...dateSelections.map(d => d.username), ...suggestions.map(s => s.username)]).size}</p>
-                                {mostCommonDate && mostCommonCount > 1 && (
-                                    <p>📅 Preferred date: {new Date(mostCommonDate).toLocaleDateString()} ({mostCommonCount} votes)</p>
+                                {mostCommonDates.length > 0 && mostCommonDates[0].count > 1 && (
+                                    <p>📅 Most popular date: {new Date(mostCommonDates[0].date + 'T00:00:00').toLocaleDateString()} ({mostCommonDates[0].count} votes)</p>
                                 )}
                                 {Object.keys(voteCounts).length > 0 && (
                                     <p>🎯 Leading activity: {Object.entries(voteCounts).sort(([, a], [, b]) => b - a)[0][0]} ({Math.max(...Object.values(voteCounts))} votes)</p>
