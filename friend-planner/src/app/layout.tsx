@@ -65,7 +65,7 @@ export default function RootLayout({
     >
       <body className="min-h-screen grow flex flex-col">
         <Navbar />
-        <main className="flex-grow flex flex-col bg-[#E6E6E6] mt-12 p-12">
+        <main className="flex-grow flex flex-col bg-[#E6E6E6] mt-12">
           <div className="flex-grow">{children}</div>
         </main>
         <Footer />
